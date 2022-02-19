@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<search>
+  <entry>
+    <title>ML-BLEU Score</title>
+    <url>/2022/02/19/ML-BLEU-Score/</url>
+    <content><![CDATA[<h1 id="ML之BLEU评分准则"><a href="#ML之BLEU评分准则" class="headerlink" title="ML之BLEU评分准则"></a>ML之BLEU评分准则</h1><h2 id="原理介绍"><a href="#原理介绍" class="headerlink" title="原理介绍"></a>原理介绍</h2><img alt="ML-BLEU-Score-2e34980e.png" src="assets/ML-BLEU-Score-2e34980e.png" width="" height="" >
+
+<p>首先来看Pn，其计算基于n-gram，直接来看例子：</p>
+<p>现在我们需要将法语翻译成英语，给出一句法语：</p>
+<p>Le chat est sur le tapis.</p>
+<p>参考翻译有：</p>
+<p>reference1： The cat is on the mat.<br>reference2:  There is a cat on the mat.</p>
+<p>而我们的机器翻译模型的输出是：</p>
+<p>MT: the the the the the the the.</p>
+<p>MT的1-gram只有the这个单词，P1就是MT当中所有在reference中出现过的1-gram数目总和除以MT的1-gram个数，这里就是7&#x2F;7 &#x3D; 1.</p>
+<p>这里计算出的1叫做precision，Pn的算法只是把单词变成了n-gram。</p>
+<p>很明显，precision在遇到上面的例子时，效果非常不好，虽然结果是1，也就是很好的翻译结果，但是MT没有任何意义，因此有了Modified precision，改良后的precision，区别就是为MT中的每个gram设定权重上限；</p>
+<p>对于上例中的1-gram “the”，在reference1中出现过两次，在reference2中出现过一次，因此限定“the”的分数最大为2，即：</p>
+<p>Modified precision &#x3D; 2&#x2F;7</p>
+<p>注意这里的上限是所有reference中该gram出现的最多次数。</p>
+<p>现在回来看公式</p>
+<p>N一般最大为4，即最多只统计4-gram的精度，各个n-gram的precision求平均后再经过exp，最后乘以BP乘法因子；</p>
+<p>乘法因子的作用就是让BLEU倾向于长度较短的翻译，在MT长度大于reference的长度时为1，否则为e的(1-refer_len&#x2F;MT_len)次方，MT越短BP越大：</p>
+<img alt="ML-BLEU-Score-18627178.png" src="assets/ML-BLEU-Score-18627178.png" width="" height="" >
+
+<h1 id="nltk-translate-bleu-score-corpus-bleu"><a href="#nltk-translate-bleu-score-corpus-bleu" class="headerlink" title="nltk.translate.bleu_score.corpus_bleu()"></a>nltk.translate.bleu_score.corpus_bleu()</h1><p>网上有很多自己实现的BLEU程序，这里给出nltk的接口使用方法：</p>
+<p>blue_score(references, hpothesis, weights)</p>
+<p>type of references: list(list(list(str)))</p>
+<p>对于单个句子的翻译，假设有reference1， reference2，<br>则references &#x3D; [[reference1, reference2]]</p>
+<p>有机器翻译结果MT，hpothesis &#x3D; [MT]</p>
+<p>weights &#x3D; [(a), (b), (c), (c), ,,,,]</p>
+<p>a,b,c,d都是n元组，表示原理公式中的N种Pn的权重，多个元组表示按照多组权值计算，输出多组结果；</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">!pip install -v nltk==<span class="number">3.7</span></span><br><span class="line"><span class="keyword">from</span> nltk.translate.bleu_score <span class="keyword">import</span> corpus_bleu</span><br><span class="line"><span class="keyword">import</span> nltk</span><br><span class="line">hyp1 = [<span class="string">&#x27;It&#x27;</span>, <span class="string">&#x27;is&#x27;</span>, <span class="string">&#x27;a&#x27;</span>, <span class="string">&#x27;guide&#x27;</span>, <span class="string">&#x27;to&#x27;</span>, <span class="string">&#x27;action&#x27;</span>, <span class="string">&#x27;which&#x27;</span>, <span class="string">&#x27;ensures&#x27;</span>, <span class="string">&#x27;that&#x27;</span>, \</span><br><span class="line">        <span class="string">&#x27;the&#x27;</span>, <span class="string">&#x27;military&#x27;</span>, <span class="string">&#x27;always&#x27;</span>,<span class="string">&#x27;obeys&#x27;</span>, <span class="string">&#x27;the&#x27;</span>, <span class="string">&#x27;commands&#x27;</span>, <span class="string">&#x27;of&#x27;</span>, <span class="string">&#x27;the&#x27;</span>, <span class="string">&#x27;party&#x27;</span>]</span><br><span class="line"></span><br><span class="line">ref1a = [<span class="string">&#x27;It&#x27;</span>, <span class="string">&#x27;is&#x27;</span>, <span class="string">&#x27;a&#x27;</span>, <span class="string">&#x27;guide&#x27;</span>, <span class="string">&#x27;to&#x27;</span>, <span class="string">&#x27;action&#x27;</span>, <span class="string">&#x27;that&#x27;</span>, <span class="string">&#x27;ensures&#x27;</span>, <span class="string">&#x27;that&#x27;</span>, \</span><br><span class="line">         <span class="string">&#x27;the&#x27;</span>, <span class="string">&#x27;military&#x27;</span>, <span class="string">&#x27;will&#x27;</span>, <span class="string">&#x27;forever&#x27;</span>, <span class="string">&#x27;heed&#x27;</span>, <span class="string">&#x27;Party&#x27;</span>, <span class="string">&#x27;commands&#x27;</span>]</span><br><span class="line"></span><br><span class="line">ref1b = [<span class="string">&#x27;It&#x27;</span>, <span class="string">&#x27;is&#x27;</span>, <span class="string">&#x27;the&#x27;</span>, <span class="string">&#x27;guiding&#x27;</span>, <span class="string">&#x27;principle&#x27;</span>, <span class="string">&#x27;which&#x27;</span>,<span class="string">&#x27;guarantees&#x27;</span>, <span class="string">&#x27;the&#x27;</span>, \</span><br><span class="line">         <span class="string">&#x27;military&#x27;</span>, <span class="string">&#x27;forces&#x27;</span>, <span class="string">&#x27;always&#x27;</span>, <span class="string">&#x27;being&#x27;</span>, <span class="string">&#x27;under&#x27;</span>, <span class="string">&#x27;the&#x27;</span>, <span class="string">&#x27;command&#x27;</span>, <span class="string">&#x27;of&#x27;</span>, <span class="string">&#x27;the&#x27;</span>, <span class="string">&#x27;Party&#x27;</span>]</span><br><span class="line"></span><br><span class="line">ref1c = [<span class="string">&#x27;It&#x27;</span>, <span class="string">&#x27;is&#x27;</span>, <span class="string">&#x27;the&#x27;</span>, <span class="string">&#x27;practical&#x27;</span>, <span class="string">&#x27;guide&#x27;</span>, <span class="string">&#x27;for&#x27;</span>, <span class="string">&#x27;the&#x27;</span>,<span class="string">&#x27;army&#x27;</span>, <span class="string">&#x27;always&#x27;</span>, \</span><br><span class="line">         <span class="string">&#x27;to&#x27;</span>, <span class="string">&#x27;heed&#x27;</span>, <span class="string">&#x27;the&#x27;</span>, <span class="string">&#x27;directions&#x27;</span>,<span class="string">&#x27;of&#x27;</span>, <span class="string">&#x27;the&#x27;</span>, <span class="string">&#x27;party&#x27;</span>]</span><br><span class="line"></span><br><span class="line">hyp2 = [<span class="string">&#x27;he&#x27;</span>, <span class="string">&#x27;read&#x27;</span>, <span class="string">&#x27;the&#x27;</span>, <span class="string">&#x27;book&#x27;</span>, <span class="string">&#x27;because&#x27;</span>, <span class="string">&#x27;he&#x27;</span>, <span class="string">&#x27;was&#x27;</span>,<span class="string">&#x27;interested&#x27;</span>, <span class="string">&#x27;in&#x27;</span>, <span class="string">&#x27;world&#x27;</span>, <span class="string">&#x27;history&#x27;</span>]</span><br><span class="line">ref2a = [<span class="string">&#x27;he&#x27;</span>, <span class="string">&#x27;was&#x27;</span>, <span class="string">&#x27;interested&#x27;</span>, <span class="string">&#x27;in&#x27;</span>, <span class="string">&#x27;world&#x27;</span>, <span class="string">&#x27;history&#x27;</span>,<span class="string">&#x27;because&#x27;</span>, <span class="string">&#x27;he&#x27;</span>, <span class="string">&#x27;read&#x27;</span>, <span class="string">&#x27;the&#x27;</span>, <span class="string">&#x27;book&#x27;</span>]</span><br><span class="line"></span><br><span class="line">list_of_references = [[ref1a, ref1b, ref1c], [ref2a]]</span><br><span class="line">hypotheses = [hyp1, hyp2]</span><br><span class="line"></span><br><span class="line">weights = [(<span class="number">0.5</span>, <span class="number">0.5</span>), \</span><br><span class="line">      (<span class="number">0.333</span>, <span class="number">0.333</span>, <span class="number">0.334</span>), \</span><br><span class="line">      (<span class="number">0.25</span>, <span class="number">0.25</span>, <span class="number">0.25</span>, <span class="number">0.25</span>), \</span><br><span class="line">      (<span class="number">0.2</span>, <span class="number">0.2</span>, <span class="number">0.2</span>, <span class="number">0.2</span>, <span class="number">0.2</span>)]</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(corpus_bleu(list_of_references, hypotheses))</span><br><span class="line"><span class="built_in">print</span>(corpus_bleu(list_of_references, hypotheses, weights=weights))</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>输出：</p>
+<img alt="ML-BLEU-Score-607658af.png" src="assets/ML-BLEU-Score-607658af.png" width="" height="" >
+
+<p>注意nltk的版本是3.7，cloab默认是3.24，是不支持多组权值的。</p>
+]]></content>
+  </entry>
+  <entry>
+    <title>Hello World</title>
+    <url>/2022/02/19/hello-world/</url>
+    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
+<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/writing.html">Writing</a></p>
+<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/server.html">Server</a></p>
+<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/generating.html">Generating</a></p>
+<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
+]]></content>
+  </entry>
+</search>
